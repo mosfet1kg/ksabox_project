@@ -1,0 +1,12 @@
+<%- partial('header') %>
+
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">KSA-WebDisk</h1>
+    <span class="glyphicon glyphicon-check" aria-hidden="true"></span>
+    <strong>IP address</strong> :<%=vm_ip%> <br />
+
+    <iframe seamless src="http://<%=vm_ip%>:52273/get/" style="border: 0px; width: 100%; height: 500px"></iframe>
+
+</div>
+
+<%- partial('footer') %>

@@ -1,0 +1,168 @@
+<%- partial('header') %>
+<style>
+    div.bs-callout-info {
+        display: block;
+        border-left-color: #1b809e;
+        width: 60%;
+    }
+    div.bs-callout-info h4 {
+        color: #1b809e;
+    }
+    .bs-callout {
+        padding: 20px;
+        margin: 20px 0;
+        border: 1px solid #eee;
+        border-left-width: 5px;
+        border-radius: 3px;
+    }
+</style>
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">VM management</h1>
+    <button type="button" class="btn btn-primary" id="vm_button">Launch Instance</button>
+    <div class="bs-callout bs-callout-info hide" id="vm_div">
+        <h4>Launch Instance</h4>
+        <form class="form-horizontal">
+            <div class="form-group form-group-sm">
+                <label class="col-sm-1 control-label" for="instance_name">Instance Name</label>
+                <div class="col-sm-10">
+                    <input class="form-control" type="text" id="instance_name" name="instance_name" placeholder="Instance Name">
+                </div>
+            </div>
+            <div class="form-group form-group-sm">
+                <label class="col-sm-1 control-label" for="flavor_type">Flavor Type</label>
+                <div class="col-sm-10">
+                    <select class="form-control" id="flavor_type" name="flavor_type">
+                    </select>
+                </div>
+            </div>
+            <div class="form-group form-group-sm">
+                <label class="col-sm-1 control-label" for="flavor_type"></label>
+                <div class="col-sm-10">
+                    <table class="table table-condensed">
+                        <tr>
+                            <td>vCPUs</td>
+                            <td id="vcpus">-</td>
+                            <td>Ram(MB)</td>
+                            <td id="ram">-</td>
+                            <td>Disk(GB)</td>
+                            <td id="disk">-</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="form-group form-group-sm">
+                <label class="col-sm-1 control-label" for="flavor_type">Booting Source</label>
+                <div class="col-sm-10">
+                    <select class="form-control" id="booting_source" name="booting_source">
+                    </select>
+                </div>
+            </div>
+        </form>
+        <button type="button" class="btn btn-info vm" id="vm_create">Create</button>
+        <button type="button" class="btn btn-warning vm" id="vm_close">Close</button>
+        <img src="/loading_42.gif" class="hide" id="vm_loading"/>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Image</th>
+                <th>Public IP</th>
+                <th>Private IP</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+            </thead>
+            <tbody>
+
+            <% for(var idx in vm_list){%>
+                <tr>
+                    <td><%=vm_list[idx].openstack.name%></td>
+                    <td><%=vm_list[idx].openstack.image.name%></td>
+                    <td><%=vm_list[idx].addresses.public[0]%></td>
+                    <td><%=vm_list[idx].addresses.private[0]%></td>
+                    <td><%=vm_list[idx].openstack.status%></td>
+                    <td><%=vm_list[idx].openstack.created%></td>
+                    <td><button type="button" class="btn btn-danger" onclick="terminate_vm(this,'<%=vm_list[idx].openstack.id%>')">Terminate</button></td>
+                </tr>
+            <% } %>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function terminate_vm(tar, vmID){
+        $(tar).addClass('hide');
+        $(tar).parent().append('<img src="/loading_42.gif" />');
+
+        $.ajax({
+            url: '/cntl/vm_terminate',
+            type: 'DELETE',
+            dataType: 'json',
+            data: {vmID: vmID},
+            success: function(result){
+                $(tar).parent().parent().remove();
+            }
+        });
+    }
+
+    $.get('/cntl/vm_getFlavors', function(results){
+        for(var idx in results.flavors){
+            $('#flavor_type').append("<option flavor_name=\'"+results.flavors[idx].name+"\' " +
+                    "disk=\'"+results.flavors[idx].disk+"\' flavor_id=\'"+ results.flavors[idx].id +"\' " +
+                    "ram=\'"+ results.flavors[idx].ram + "\' " +
+                    "vcpus=\'" + results.flavors[idx].vcpus +
+                    "\'>" + results.flavors[idx].name +"</option>");
+        }
+        $('#flavor_type').trigger('change');
+    })
+
+    $('#flavor_type').on('change', function(e){
+        e.preventDefault();
+        $('#vcpus').html($( "#flavor_type option:selected").attr('vcpus'));
+        $('#ram').html($( "#flavor_type option:selected").attr('ram'));
+        $('#disk').html($( "#flavor_type option:selected").attr('disk'));
+
+    })
+
+    $.get('/cntl/vm_getImages', function(results){
+        for(var idx in results.images){
+            $('#booting_source').append("<option image_name=\'"+results.images[idx].name+"\' " +
+                    "image_id=\'" + results.images[idx].id +
+                    "\'>" + results.images[idx].name +"</option>");
+        }
+    })
+
+    $('#vm_create').click(function(){
+        if( $('#instance_name').val().length == 0 ){
+            alert('Instance name cannot be null!');
+        }else{
+            $('.vm').addClass('hide');
+            $('#vm_loading').removeClass('hide');
+
+            var data = {
+                instance_name : $('#instance_name').val(),
+                flavor_id     : $("#flavor_type option:selected").attr('flavor_id'),
+                image_id : $('#booting_source option:selected').attr('image_id')
+            }
+
+            $.post('/cntl/vm_create', data, function(result){
+                location.reload(true)
+            })
+        }
+    });
+
+    $('#vm_button').click(function(){
+        $('#vm_button').addClass('hide');
+        $('#vm_div').removeClass('hide');
+    })
+
+    $('#vm_close').click(function(){
+        $('#vm_div').addClass('hide');
+        $('#vm_button').removeClass('hide');
+    });
+</script>
+<%- partial('footer') %>

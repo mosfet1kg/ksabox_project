@@ -1,0 +1,109 @@
+<%- partial('header') %>
+
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">Collaborative Work</h1>
+    <div class="row">
+        <div class="col-md-4">
+            <iframe src="http://143.248.142.191:3001" style="border: 0px; height:800px"></iframe>
+        </div>
+        <div class="col-md-8">
+            <select id="vdi_option">
+                <option value="--"> -- </option>
+                <% for(var idx in vm_list){%>
+                    <% if( vm_list[idx].openstack.status == "ACTIVE" && vm_list[idx].openstack.image.name == 'R&E_VDI' ){%>
+                        <option value="<%=vm_list[idx].addresses.public[0]%>"><%=vm_list[idx].openstack.name%> - <%=vm_list[idx].addresses.public[0]%> </option>
+                    <%}%>
+                <% } %>
+            </select>
+
+            <canvas id="screen" style=" border: 1px solid black" >
+            </canvas>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+
+    //        var Path = window.location.host;
+    var Path;
+    var socket;// = io.connect(Path);
+    var canvas = document.getElementById('screen');
+    var ctx = canvas.getContext('2d');
+    canvas.width = 1024;
+    canvas.height = 768;
+    ctx.width = 1024;
+    ctx.height = 768;
+    ctx.lineWidth= 1;
+    var color = [];
+    var idx = 0;
+    var isDown = false;     //flag we use to keep track
+
+    $('#vdi_option').change(function(){
+        if( $(this).val() == '--'){
+            Path = null;
+        }else{
+            Path = $(this).val()+":55555"
+            socket = io.connect(Path);
+            socket.emit('publish');
+
+            socket.on('canvas', function(data) {
+                var context = document.getElementById('screen').getContext("2d");
+                var img = new Image();
+                if( !!Path )
+                    img.src = 'http://'+Path+"/bg.png?type="+Math.random();
+
+                img.onload = function () {
+                    context.drawImage(img, 0, 0);
+                    if( !!Path )
+                        socket.emit('publish');
+                };
+            });
+
+
+            //http://www.w3schools.com/jsref/tryit.asp?filename=tryjsref_event_mouse_button
+            $('#screen').on('mousedown', function(e){
+                if (isDown === false) {
+                    isDown = true;
+                    var pos = getMousePos(canvas, e);
+                    socket.emit('mouseClick', pos);
+                }
+            });
+            $('#screen').on('mousemove', function(e){
+                socket.emit('mouseMove', getMousePos(canvas, e))
+            });
+            // when mouse button is released (note: window, not canvas here)
+            $('#screen').on('mouseup', function(e){
+                if (isDown === true) {
+                    isDown = false;
+                    var pos = getMousePos(canvas, e);
+                    socket.emit('mouseRelease', pos);
+                    //we got two sets of coords, process them
+                    //        alert(x1 + ',' + y1 + ',' +x2 + ',' +y2);
+                }
+            });
+
+            $(window).on('keydown', function(e){
+                console.log(e);
+                socket.emit('keyboard', e.keyCode)
+            });
+            $(window).on('keyup', function(e){
+                console.log(e);
+            });
+        }
+    })
+
+    // get mouse pos relative to canvas (yours is fine, this is just different)
+    function getMousePos(canvas, evt) {
+        var rect = canvas.getBoundingClientRect();
+        return {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top,
+            button: evt.button
+        };
+    }
+
+</script>
+
+<%- partial('footer') %>

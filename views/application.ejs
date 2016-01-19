@@ -1,0 +1,325 @@
+<%- partial('header') %>
+<style>
+    div.bs-callout-info {
+        display: block;
+        border-left-color: #1b809e;
+        width: 60%;
+    }
+    div.bs-callout-info h4 {
+        color: #1b809e;
+    }
+    .bs-callout {
+        padding: 20px;
+        margin: 20px 0;
+        border: 1px solid #eee;
+        border-left-width: 5px;
+        border-radius: 3px;
+    }
+</style>
+
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">Distributed Computing Application</h1>
+
+    <div class="table-responsive" id="step_resource_select">
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th><input type="checkbox" id="all_check"></th>
+                <th>Name</th>
+                <th>Image</th>
+                <th>Public IP</th>
+                <th>Private IP</th>
+                <th>Status</th>
+            </tr>
+            </thead>
+            <tbody>
+
+            <% for(var idx in vm_list){%>
+            <% if( vm_list[idx].openstack.status == "ACTIVE" &&
+                    (vm_list[idx].openstack.image.name == 'FFMPEG' || vm_list[idx].openstack.image.name == 'mesos_v0.1') ){%>
+            <tr>
+                <td><input name="<%=vm_list[idx].openstack.name%>" class="vm_element" type="checkbox" vm_ip="<%=vm_list[idx].addresses.public[0]%>"></td>
+                <td><%=vm_list[idx].openstack.name%></td>
+                <td><%=vm_list[idx].openstack.image.name%></td>
+                <td><%=vm_list[idx].addresses.public[0]%></td>
+                <td><%=vm_list[idx].addresses.private[0]%></td>
+                <td><%=vm_list[idx].openstack.status%></td>
+            </tr>
+            <%}%>
+            <% } %>
+            </tbody>
+        </table>
+        <button type="button" class="btn btn-primary btn-lg" id="vm_resource"> Next </button>
+    </div>
+
+    <div class="col-md-9 hide" id="step_video_select">
+        <!--<h1 class="page-header">KSA File Explorer</h1>-->
+        <button type="button" class="btn btn-primary" id="OpenUploadArea">File Upload</button>
+
+        <div class="bs-callout bs-callout-info hide" id="UploadBox">
+            <h4>File Upload</h4>
+                 <span id='UploadArea'>
+                     <p>
+                         <label for="FileBox">Choose A File: </label><input type="file" id="FileBox"><br>
+                         <label for="NameBox">Name: </label><input type="text" id="NameBox" style="width:100%"><br>
+                     </p>
+                     <button type='button' id='UploadButton' class='btn btn-info'>Upload</button>
+                     <button type="button" class="btn btn-warning" id="CloseUploadArea">Close</button>
+               </span>
+        </div>
+
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th></th>
+                <th>Name</th>
+                <th>Modified Date</th>
+                <th>Size(KB)</th>
+                <th>Kind</th>
+                <th>Others</th>
+            </tr>
+            </thead>
+            <tbody id="contents">
+
+            </tbody>
+        </table>
+        <button type="button" class="btn btn-danger btn-lg" id="video_converting"> Converting </button>
+        <img src="/loading_42.gif" id="loading_img" class="hide"/>
+    </div>
+
+    <div class="col-md-9 hide" id="step_converting_progress">
+        <h3>Progress</h3>
+        <h4><p class="bg-success" id="process_status">  </p></h4>
+
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th class="col-md-3">Host</th>
+                <th class="col-md-9">Progress</th>
+            </tr>
+            </thead>
+            <tbody id="converting_progress">
+
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    var resource = [];
+
+    $('#all_check').click(function(){
+        //만약 전체 선택 체크박스가 체크된상태일경우
+        if($("#all_check").prop("checked")) {
+            //해당화면에 전체 checkbox들을 체크해준다
+            $(".vm_element").prop("checked",true);
+            // 전체선택 체크박스가 해제된 경우
+        } else {
+            //해당화면에 모든 checkbox들의 체크를해제시킨다.
+            $(".vm_element").prop("checked",false);
+            //$("input[type=checkbox]").prop("checked",false);
+        }
+    })
+
+    $('#vm_resource').click(function(){
+        resource = [];
+        $('.vm_element:checkbox:checked').each(function(idx, element){
+            resource.push({host: $(this).attr('vm_ip')});
+        })
+
+        $('#step_resource_select').addClass('hide');
+        $('#step_video_select').removeClass('hide');
+    })
+
+    function update_filelist(){
+        $.get('/get/', function(data) {
+            var str = '';
+            $('#contents').empty();
+            data.list.forEach(function (record) {
+                str = '';
+                str += "<tr><td><input type='radio' name='VideoOptions' file_name=\'"+record.name+"\'></td>";
+                str += "<td class='fileName' value=\'" + record.link + "\'>" +
+                        "<a href=\'/down" + record.link + "\'>" + record.name + "</a></td>" +
+                        "<td>" + record.mtime + "</td>" +
+                        "<td>" + record.size + "</td>";
+                var temp = record.name.split(".")[record.name.split(".").length - 1]; //확장자만 따온다
+                var type = getFileType(temp);
+
+                str += "<td>" + type + "</td>"
+                str += "<td><button type='button' class='btn btn-primary btn-xs' onclick='removeItem($(this))'>Remove</button></td></tr>"
+                $('#contents').append(str);
+
+            })
+        });
+    }
+    update_filelist();
+
+    function getFileType(value){
+        switch(value){
+            case 'txt':
+                return 'Text File'
+            case 'hwp':
+                return 'Hangul File'
+            default :
+                return value + ' File';
+        }
+    }
+
+    var Path = window.location.host;
+    var socket = io.connect(Path);
+    var video_duration=0, segment_time=0;
+
+    $('#video_converting').click(function(){
+
+        $('#step_converting_progress').removeClass('hide');
+
+        var data = { file: $(':radio:checked').attr('file_name'), resource: resource};
+        socket.emit('video_converting', data);
+
+        var str = '';
+        for(var idx in resource){
+            str+="<tr><td><img src='data:image/png;base64,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'>"+
+                    resource[idx].host+'</td>'+
+                    '<td><div class="progress"><div class="progress-bar" id=\'host_'+ idx +'\' role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">'+
+                    '0%</div></div></td></tr>'
+        }
+
+        $('#converting_progress').append(str);
+
+        $('#video_converting').addClass('hide');
+        $('#loading_img').removeClass('hide');
+    })
+
+    socket.on('video_duration', function(data){
+        video_duration = data.video_duration;
+        segment_time = data.segment_time;
+    })
+
+    socket.on('video_update_progress', function(data){
+        var idx = data.idx;
+        var host = resource[idx].host;
+        var curr_percentage;
+
+        var curr_time = parseInt(data.time.split(':')[0])*3600+parseInt(data.time.split(':')[1])*60+parseFloat(data.time.split(':')[2]);
+
+        if( idx+1 == resource.length)
+            curr_percentage = curr_time / (video_duration - segment_time*(resource.length-1) )* 100;
+        else
+            curr_percentage = curr_time / segment_time * 100;
+
+        if(curr_percentage > 100 ) curr_percentage = 100;
+
+//        console.log(curr_percentage, host);
+        $('#host_'+idx).attr('aria-valuenow', curr_percentage);
+        $('#host_'+idx).css('width', curr_percentage + '%');
+        $('#host_'+idx).html( (Math.round(curr_percentage*100)/100) + '%');
+    });
+
+    socket.on('video_progress', function(data){
+        var status = data.status;
+        $('#process_status').html(status);
+
+        if(status=='Complete'){
+            update_filelist();
+            for(var idx in resource){
+                $('#host_'+idx).attr('aria-valuenow', 100);
+                $('#host_'+idx).css('width', 100 + '%');
+                $('#host_'+idx).html( '100%');
+            }
+
+            $('#loading_img').addClass('hide');
+        }
+    })
+
+</script>
+
+
+<script>
+    if(window.File && window.FileReader){ //These are the relevant HTML5 objects that we are going to use
+        $('#UploadButton').on('click', StartUpload);
+        $('#FileBox').on('change', FileChosen);
+    }
+    else
+    {
+        document.getElementById('UploadArea').innerHTML = "Your Browser Doesn't Support The File API Please Update Your Browser";
+    }
+
+    var SelectedFile;
+    function FileChosen(event) {
+        SelectedFile = event.target.files[0];
+        document.getElementById('NameBox').value = SelectedFile.name;
+    }
+    var Path = window.location.host;
+    var socket = io.connect(Path);
+    var FReader;
+    var Name;
+    function StartUpload(){
+        if(document.getElementById('FileBox').value != "")
+        {
+            FReader = new FileReader();
+            Name = $('#NameBox').val();
+            var Content = "<span id='NameArea'>Uploading " + SelectedFile.name + " as " + Name + "</span>";
+            Content += '<div class="progress"><div class="progress-bar" id="progressbar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0% </div> </div>';
+            Content += "<span id='Uploaded'> - <span id='MB'>0</span>/" + Math.round(SelectedFile.size / 1048576) + "MB</span>";
+            document.getElementById('UploadArea').innerHTML = Content;  //기존에 있던 파일 선택창과 name 박스를 삭제하고 업로드 상황으로 바꾼다
+            FReader.onload = function(evnt){  //load 이벤트 핸들러. 이 이벤트는 읽기 동작이 성공적으로 완료 되었을 때 마다 발생합니다.
+                socket.emit('Upload', { 'Name' : Name, Data : evnt.target.result });
+            };
+            socket.emit('Start', { 'Name' : Name, 'Size' : SelectedFile.size, 'Pathname' : window.location.pathname });
+        }
+        else
+        {
+            alert("Please Select A File");
+        }
+    }
+    socket.on('Done', function (data){
+        location.reload(true);
+//        var Content = "Video Successfully Uploaded !!";
+////            Content += "<img id='Thumb' src='" + data['Image'] + "' alt='" + Name + "'><br>";
+//        Content += "<button  type='button' name='Upload' value='' id='Restart' class='Button'>Upload Another</button>";
+//        document.getElementById('UploadArea').innerHTML = Content;
+//        document.getElementById('Restart').addEventListener('click', Refresh);
+    });
+    function Refresh(){
+        location.reload(true);
+    }
+    socket.on('MoreData', function (data){
+        UpdateBar(data['Percent']);
+        var Place = data['Place'] * 524288; //The Next Blocks Starting Position
+        var NewFile = SelectedFile.slice(Place, Place + Math.min(524288, (SelectedFile.size-Place)));  //The Variable that will hold the new Block of Data
+        FReader.readAsBinaryString(NewFile);   // FReader.onload 이벤트 참조
+    });
+    function UpdateBar(percent){
+        $('#progressbar').attr('aria-valuenow', Math.round(percent));
+        $('#progressbar').css('width', Math.round(percent) + '%');
+        $('#progressbar').html((Math.round(percent*100)/100) + '%');
+        var MBDone = Math.round(((percent/100.0) * SelectedFile.size) / 1048576);
+        document.getElementById('MB').innerHTML = MBDone;
+    }
+
+    $('#OpenUploadArea').click(function(){
+        $('#UploadBox').removeClass('hide');
+        $('#OpenUploadArea').addClass('hide');
+    });
+
+    $('#CloseUploadArea').click(function() {
+        $('#OpenUploadArea').removeClass('hide');
+        $('#UploadBox').addClass('hide');
+    })
+
+    function removeItem($dom){
+        var value = $dom.parent().parent().children('.fileName').attr('value');
+        $.ajax({
+            url: '/remove',
+            type: 'DELETE',
+            data: {item: value},
+            dataType: 'json',
+            success: function(result){
+                if(result.success){
+                    $dom.parent().parent().remove();
+                }
+            }
+        })
+    }
+</script>
+
+<%- partial('footer') %>

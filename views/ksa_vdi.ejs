@@ -1,0 +1,78 @@
+<%- partial('header') %>
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">KSA-VDI</h1>
+    <span class="glyphicon glyphicon-check" aria-hidden="true"></span>
+    <strong>IP address</strong> :<%=vm_ip%>
+
+    <!--<canvas id="screen" width="1024" height="768" style=" border: 1px solid black" >-->
+    <canvas id="screen" style=" border: 1px solid black" >
+    </canvas>
+    <script>
+//        var Path = window.location.host;
+        var Path = '<%=vm_ip%>:55555';
+        var socket = io.connect(Path);
+        var canvas = document.getElementById('screen');
+        var ctx = canvas.getContext('2d');
+        canvas.width = 1024;
+        canvas.height = 768;
+        ctx.width = 1024;
+        ctx.height = 768;
+        ctx.lineWidth= 1;
+        var color = [];
+        var idx = 0;
+
+        socket.emit('publish');
+        socket.on('canvas', function(data) {
+//        console.log('canvas');
+            var context = document.getElementById('screen').getContext("2d");
+            var img = new Image();
+            img.src = 'http://'+Path+"/bg.png?type="+Math.random();
+            img.onload = function () {
+                context.drawImage(img, 0, 0);
+                socket.emit('publish');
+            };
+        });
+        var isDown = false;     //flag we use to keep track
+        //http://www.w3schools.com/jsref/tryit.asp?filename=tryjsref_event_mouse_button
+        $('#screen').on('mousedown', function(e){
+            if (isDown === false) {
+                isDown = true;
+                var pos = getMousePos(canvas, e);
+                socket.emit('mouseClick', pos);
+            }
+        });
+        $('#screen').on('mousemove', function(e){
+            socket.emit('mouseMove', getMousePos(canvas, e))
+        });
+        // when mouse button is released (note: window, not canvas here)
+        $('#screen').on('mouseup', function(e){
+            if (isDown === true) {
+                isDown = false;
+                var pos = getMousePos(canvas, e);
+                socket.emit('mouseRelease', pos);
+                //we got two sets of coords, process them
+                //        alert(x1 + ',' + y1 + ',' +x2 + ',' +y2);
+            }
+        });
+        // get mouse pos relative to canvas (yours is fine, this is just different)
+        function getMousePos(canvas, evt) {
+            var rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top,
+                button: evt.button
+            };
+        }
+        $(window).on('keydown', function(e){
+            console.log(e);
+            socket.emit('keyboard', e.keyCode)
+        });
+        $(window).on('keyup', function(e){
+            console.log(e);
+        });
+    </script>
+
+
+</div>
+
+<%- partial('footer') %>

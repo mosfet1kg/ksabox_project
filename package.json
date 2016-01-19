@@ -1,0 +1,23 @@
+{
+  "name": "ksa-box",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^1.5.0",
+    "body-parser": "^1.14.2",
+    "ejs-mate": "^2.3.0",
+    "express": "^4.13.3",
+    "express-session": "^1.12.1",
+    "glob": "^6.0.2",
+    "mongodb": "^2.1.2",
+    "pkgcloud": "^1.2.0-alpha.0",
+    "socket.io": "^1.3.7",
+    "underscore": "^1.8.3"
+  }
+}
